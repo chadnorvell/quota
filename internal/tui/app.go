@@ -104,6 +104,9 @@ func renderProvider(snapshot provider.Snapshot, width int, mode displayMode) str
 	if snapshot.Source != "" {
 		meta = append(meta, snapshot.Source)
 	}
+	if snapshot.Plan != "" {
+		meta = append(meta, "plan "+provider.PlanName(snapshot.Plan))
+	}
 	if snapshot.Account != "" {
 		meta = append(meta, snapshot.Account)
 	}

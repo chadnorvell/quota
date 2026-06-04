@@ -84,22 +84,24 @@ func fetchCodexOAuth(ctx context.Context, auth codexAuth) (Snapshot, error) {
 
 func codexOAuthLanes(value any) []Lane {
 	var lanes []Lane
-	addWindow := func(label string, keys ...string) {
-		for _, key := range keys {
-			if window, ok := windowAt(value, key); ok {
+	addWindow := func(label string, paths ...[]string) {
+		for _, path := range paths {
+			if window, ok := windowAt(value, path...); ok {
 				lanes = append(lanes, windowLane(label, window))
 				return
 			}
 		}
 	}
-	addWindow("Primary", "rate_limit", "primary_window")
-	addWindow("Primary", "primary_window")
-	addWindow("Secondary", "rate_limit", "secondary_window")
-	addWindow("Secondary", "secondary_window")
+	addWindow("5h limit", []string{"rate_limit", "primary_window"}, []string{"primary_window"})
+	addWindow("weekly limit", []string{"rate_limit", "secondary_window"}, []string{"secondary_window"})
 
 	if root, ok := value.(map[string]any); ok {
 		if credits, ok := root["credits"].(map[string]any); ok {
-			if balance, ok := number(credits["balance"]); ok {
+			hasCredits := false
+			if value, ok := credits["has_credits"].(bool); ok {
+				hasCredits = value
+			}
+			if balance, ok := number(credits["balance"]); ok && hasCredits {
 				lanes = append(lanes, Lane{
 					Label:  "Credits",
 					Used:   balance,
@@ -122,7 +124,10 @@ func codexOAuthLanes(value any) []Lane {
 					label = "Extra limit"
 				}
 				if window, ok := windowAt(object, "rate_limit", "primary_window"); ok {
-					lanes = append(lanes, windowLane(label, window))
+					lanes = append(lanes, windowLane(label+" 5h", window))
+				}
+				if window, ok := windowAt(object, "rate_limit", "secondary_window"); ok {
+					lanes = append(lanes, windowLane(label+" weekly", window))
 				}
 			}
 		}

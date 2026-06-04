@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -32,7 +33,17 @@ func runOnce() {
 	ctx := context.Background()
 	for _, source := range []provider.Source{provider.NewCodex(), provider.NewClaude()} {
 		snapshot := source.Fetch(ctx)
-		fmt.Printf("%s: %s\n", snapshot.Name, snapshot.Status)
+		statusParts := []string{snapshot.Status}
+		if snapshot.Source != "" {
+			statusParts = append(statusParts, snapshot.Source)
+		}
+		if snapshot.Plan != "" {
+			statusParts = append(statusParts, "plan "+provider.PlanName(snapshot.Plan))
+		}
+		if snapshot.Account != "" {
+			statusParts = append(statusParts, snapshot.Account)
+		}
+		fmt.Printf("%s: %s\n", snapshot.Name, strings.Join(statusParts, " | "))
 		for _, lane := range snapshot.Lanes {
 			fmt.Printf("  %-18s %6.1f%% %s\n", lane.Label, lane.Percent, lane.Detail)
 		}
