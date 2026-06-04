@@ -1,0 +1,6 @@
+.go/
+result
+dist/
+*.test
+.envrc
+.direnv/
