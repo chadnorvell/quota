@@ -46,5 +46,26 @@
         apps.default = flake-utils.lib.mkApp {
           drv = self.packages.${system}.default;
         };
-      });
+      }) // {
+        nixosModules.default = { config, lib, pkgs, ... }:
+          let
+            cfg = config.programs.quota;
+          in
+          {
+            options.programs.quota = {
+              enable = lib.mkEnableOption "quota terminal AI service quota dashboard";
+
+              package = lib.mkOption {
+                type = lib.types.package;
+                default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+                defaultText = lib.literalExpression "inputs.quota.packages.\${pkgs.stdenv.hostPlatform.system}.default";
+                description = "The quota package to install.";
+              };
+            };
+
+            config = lib.mkIf cfg.enable {
+              environment.systemPackages = [ cfg.package ];
+            };
+          };
+      };
 }

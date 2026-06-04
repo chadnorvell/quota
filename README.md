@@ -66,6 +66,35 @@ If you keep this as a local/private checkout, replace the input URL with:
 inputs.quota.url = "path:/path/to/quota";
 ```
 
+Install globally through the NixOS module:
+
+```nix
+{
+  inputs.quota.url = "github:chadnorvell/quota";
+
+  outputs = { nixpkgs, quota, ... }: {
+    nixosConfigurations.your-host = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        quota.nixosModules.default
+        {
+          programs.quota.enable = true;
+        }
+      ];
+    };
+  };
+}
+```
+
+With the module imported elsewhere in your configuration, the usage is:
+
+```nix
+{
+  imports = [ inputs.quota.nixosModules.default ];
+  programs.quota.enable = true;
+}
+```
+
 ## Credentials
 
 Codex:
