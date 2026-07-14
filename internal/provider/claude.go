@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -153,8 +154,66 @@ func claudeOAuthLanes(value any) []Lane {
 			lanes = append(lanes, lane)
 		}
 	}
+	lanes = append(lanes, claudeScopedWeeklyLanes(value)...)
 	if len(lanes) == 0 {
 		lanes = append(lanes, Lane{Label: "Usage", Detail: "fetched; parser needs response shape sample"})
+	}
+	return lanes
+}
+
+// claudeScopedWeeklyLanes handles Anthropic's newer limits-array response.
+// Model-specific weekly limits such as Fable are no longer represented by
+// seven_day_* fields in that shape.
+func claudeScopedWeeklyLanes(value any) []Lane {
+	root, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	limits, ok := root["limits"].([]any)
+	if !ok {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	var lanes []Lane
+	for _, candidate := range limits {
+		limit, ok := candidate.(map[string]any)
+		if !ok {
+			continue
+		}
+		kind, _ := stringAt(limit, "kind")
+		group, _ := stringAt(limit, "group")
+		if kind != "weekly_scoped" || group != "weekly" {
+			continue
+		}
+		used, ok := number(limit["percent"])
+		if !ok {
+			continue
+		}
+		modelName, _ := stringAt(limit, "scope", "model", "display_name")
+		modelName = strings.TrimSpace(modelName)
+		if modelName == "" || seen[strings.ToLower(modelName)] {
+			continue
+		}
+		seen[strings.ToLower(modelName)] = true
+
+		reset := ""
+		if resetsAt, ok := stringAt(limit, "resets_at"); ok {
+			reset = formatClaudeReset(resetsAt)
+		}
+		detail := fmt.Sprintf("%.1f%% used", used)
+		if reset != "" {
+			detail += " reset " + reset
+		}
+		lanes = append(lanes, Lane{
+			Label:   "7d " + modelName,
+			Used:    used,
+			Limit:   100,
+			Percent: percent(used, 100),
+			Unit:    "%",
+			Detail:  detail,
+			Reset:   reset,
+		})
 	}
 	return lanes
 }
