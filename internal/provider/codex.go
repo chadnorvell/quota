@@ -10,27 +10,41 @@ import (
 	"time"
 )
 
-type Codex struct{}
+type Codex struct {
+	credentialsDir string
+	useFallbacks   bool
+}
 
 func NewCodex() Codex {
-	return Codex{}
+	return Codex{credentialsDir: defaultCredentialsDir(".codex"), useFallbacks: true}
 }
 
-func (Codex) Name() string {
-	return "Codex"
+// NewCodexFromDir creates an additional Codex account backed by dir/auth.json.
+func NewCodexFromDir(dir string) Codex {
+	return Codex{credentialsDir: expandHome(dir)}
 }
 
-func (Codex) Fetch(ctx context.Context) Snapshot {
-	auth := readCodexAuth()
+func (c Codex) Name() string {
+	return accountName("Codex", c.credentialsDir, ".codex")
+}
+
+func (c Codex) Fetch(ctx context.Context) Snapshot {
+	auth := readCodexAuth(c.credentialsDir)
 	if auth.AccessToken != "" {
 		if snapshot, err := fetchCodexOAuth(ctx, auth); err == nil {
+			snapshot.Name = c.Name()
 			return snapshot
 		}
 	}
 
-	cookie := firstEnv("QUOTA_CODEX_COOKIE", "OPENAI_COOKIE", "CHATGPT_COOKIE")
+	cookie := ""
+	if c.useFallbacks {
+		cookie = firstEnv("QUOTA_CODEX_COOKIE", "OPENAI_COOKIE", "CHATGPT_COOKIE")
+	}
 	if cookie != "" {
-		return fetchCodexDashboard(ctx, cookie)
+		snapshot := fetchCodexDashboard(ctx, cookie)
+		snapshot.Name = c.Name()
+		return snapshot
 	}
 
 	if auth.Account != "" || auth.HasToken {
@@ -39,7 +53,7 @@ func (Codex) Fetch(ctx context.Context) Snapshot {
 			status = "account found"
 		}
 		return Snapshot{
-			Name:      "Codex",
+			Name:      c.Name(),
 			Account:   auth.Account,
 			Source:    auth.Path,
 			Status:    status,
@@ -48,7 +62,7 @@ func (Codex) Fetch(ctx context.Context) Snapshot {
 		}
 	}
 
-	return NewUnavailable("Codex", "local auth", "no QUOTA_CODEX_COOKIE and no readable ~/.codex/auth.json")
+	return NewUnavailable(c.Name(), "local auth", "no readable "+filepath.Join(c.credentialsDir, "auth.json"))
 }
 
 func fetchCodexOAuth(ctx context.Context, auth codexAuth) (Snapshot, error) {
@@ -227,12 +241,8 @@ type codexAuth struct {
 	HasToken    bool
 }
 
-func readCodexAuth() codexAuth {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return codexAuth{}
-	}
-	path := filepath.Join(home, ".codex", "auth.json")
+func readCodexAuth(credentialsDir string) codexAuth {
+	path := filepath.Join(credentialsDir, "auth.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return codexAuth{}

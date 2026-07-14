@@ -271,8 +271,8 @@ func renderBar(providerName string, percent float64, width int, mode displayMode
 }
 
 func providerBarStyle(providerName string) lipgloss.Style {
-	switch strings.ToLower(providerName) {
-	case "claude":
+	switch {
+	case strings.HasPrefix(strings.ToLower(providerName), "claude"):
 		return styles.claude
 	default:
 		return styles.ok

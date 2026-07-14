@@ -18,6 +18,15 @@ For a non-interactive fetch:
 go run ./cmd/quota once
 ```
 
+Track additional accounts by passing their credentials directories. Each flag
+is repeatable and the default `~/.codex` and `~/.claude` accounts remain
+enabled:
+
+```sh
+quota --claude-dir ~/.claude-work --codex-dir ~/.codex-work
+quota once --claude-dir ~/.claude-work
+```
+
 Or run the packaged binary:
 
 ```sh
@@ -112,6 +121,13 @@ Claude:
   and cost report requests.
 - `QUOTA_CLAUDE_COOKIE` or `CLAUDE_COOKIE` enables the Claude web API fallback.
   The value can be either a full `Cookie` header or a bare `sessionKey` value.
+
+Extra accounts:
+
+- Repeat `--codex-dir DIR` to read additional `DIR/auth.json` files.
+- Repeat `--claude-dir DIR` to read additional `DIR/.credentials.json` files.
+- `~` is expanded even when it is passed literally (for example,
+  `--claude-dir=~/.claude-work`).
 
 Keys:
 

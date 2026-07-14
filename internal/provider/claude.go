@@ -10,29 +10,45 @@ import (
 	"time"
 )
 
-type Claude struct{}
+type Claude struct {
+	credentialsDir string
+	useFallbacks   bool
+}
 
 func NewClaude() Claude {
-	return Claude{}
+	return Claude{credentialsDir: defaultCredentialsDir(".claude"), useFallbacks: true}
 }
 
-func (Claude) Name() string {
-	return "Claude"
+// NewClaudeFromDir creates an additional Claude account backed by
+// dir/.credentials.json.
+func NewClaudeFromDir(dir string) Claude {
+	return Claude{credentialsDir: expandHome(dir)}
 }
 
-func (Claude) Fetch(ctx context.Context) Snapshot {
-	if auth := readClaudeOAuth(); auth.AccessToken != "" {
+func (c Claude) Name() string {
+	return accountName("Claude", c.credentialsDir, ".claude")
+}
+
+func (c Claude) Fetch(ctx context.Context) Snapshot {
+	if auth := readClaudeOAuth(c.credentialsDir); auth.AccessToken != "" {
 		if snapshot, err := fetchClaudeOAuth(ctx, auth); err == nil {
+			snapshot.Name = c.Name()
 			return snapshot
 		}
 	}
-	if key := firstEnv("ANTHROPIC_ADMIN_KEY", "CLAUDE_ADMIN_KEY"); key != "" {
-		return fetchClaudeAdmin(ctx, key)
+	if c.useFallbacks {
+		if key := firstEnv("ANTHROPIC_ADMIN_KEY", "CLAUDE_ADMIN_KEY"); key != "" {
+			snapshot := fetchClaudeAdmin(ctx, key)
+			snapshot.Name = c.Name()
+			return snapshot
+		}
+		if cookie := firstEnv("QUOTA_CLAUDE_COOKIE", "CLAUDE_COOKIE"); cookie != "" {
+			snapshot := fetchClaudeWeb(ctx, cookie)
+			snapshot.Name = c.Name()
+			return snapshot
+		}
 	}
-	if cookie := firstEnv("QUOTA_CLAUDE_COOKIE", "CLAUDE_COOKIE"); cookie != "" {
-		return fetchClaudeWeb(ctx, cookie)
-	}
-	return NewUnavailable("Claude", "config", "set ANTHROPIC_ADMIN_KEY or QUOTA_CLAUDE_COOKIE")
+	return NewUnavailable(c.Name(), "local auth", "no readable "+filepath.Join(c.credentialsDir, ".credentials.json"))
 }
 
 type claudeOAuthAuth struct {
@@ -43,12 +59,8 @@ type claudeOAuthAuth struct {
 	ExpiresAt        time.Time
 }
 
-func readClaudeOAuth() claudeOAuthAuth {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return claudeOAuthAuth{}
-	}
-	path := filepath.Join(home, ".claude", ".credentials.json")
+func readClaudeOAuth(credentialsDir string) claudeOAuthAuth {
+	path := filepath.Join(credentialsDir, ".credentials.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return claudeOAuthAuth{}
