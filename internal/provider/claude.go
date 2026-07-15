@@ -223,9 +223,6 @@ func utilizationLane(label string, window map[string]any) (Lane, bool) {
 	if !ok {
 		return Lane{}, false
 	}
-	if utilization <= 1 {
-		utilization *= 100
-	}
 	detail := fmt.Sprintf("%.1f%% used", utilization)
 	reset := ""
 	if value, ok := stringAt(window, "resets_at"); ok {

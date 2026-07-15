@@ -6,12 +6,14 @@ func TestCodexOAuthLanesIncludesSecondaryWindow(t *testing.T) {
 	payload := map[string]any{
 		"rate_limit": map[string]any{
 			"primary_window": map[string]any{
-				"used_percent": float64(22),
-				"reset_at":     float64(1766948068),
+				"used_percent":         float64(22),
+				"reset_at":             float64(1766948068),
+				"limit_window_seconds": float64(7 * 24 * 60 * 60),
 			},
 			"secondary_window": map[string]any{
-				"used_percent": float64(43),
-				"reset_at":     float64(1767407914),
+				"used_percent":         float64(43),
+				"reset_at":             float64(1767407914),
+				"limit_window_seconds": float64(5 * 60 * 60),
 			},
 		},
 	}
@@ -20,8 +22,21 @@ func TestCodexOAuthLanesIncludesSecondaryWindow(t *testing.T) {
 	if len(lanes) != 2 {
 		t.Fatalf("got %d lanes, want primary and weekly: %+v", len(lanes), lanes)
 	}
-	if got := lanes[1]; got.Label != "weekly limit" || got.Percent != 43 {
+	if got := lanes[0]; got.Label != "weekly limit" || got.Percent != 22 {
 		t.Fatalf("weekly lane = %+v", got)
+	}
+	if got := lanes[1]; got.Label != "5h limit" || got.Percent != 43 {
+		t.Fatalf("5h lane = %+v", got)
+	}
+}
+
+func TestClaudeUtilizationIsAlreadyAPercentage(t *testing.T) {
+	lane, ok := utilizationLane("5h session", map[string]any{"utilization": float64(0.7)})
+	if !ok {
+		t.Fatal("utilization lane was not parsed")
+	}
+	if lane.Percent != 0.7 || lane.Used != 0.7 {
+		t.Fatalf("session lane = %+v, want 0.7%% used", lane)
 	}
 }
 

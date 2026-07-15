@@ -101,7 +101,7 @@ func codexOAuthLanes(value any) []Lane {
 	addWindow := func(label string, paths ...[]string) {
 		for _, path := range paths {
 			if window, ok := windowAt(value, path...); ok {
-				lanes = append(lanes, windowLane(label, window))
+				lanes = append(lanes, windowLane(codexWindowLabel(label, window), window))
 				return
 			}
 		}
@@ -138,15 +138,36 @@ func codexOAuthLanes(value any) []Lane {
 					label = "Extra limit"
 				}
 				if window, ok := windowAt(object, "rate_limit", "primary_window"); ok {
-					lanes = append(lanes, windowLane(label+" 5h", window))
+					lanes = append(lanes, windowLane(label+" "+codexWindowLabel("5h", window), window))
 				}
 				if window, ok := windowAt(object, "rate_limit", "secondary_window"); ok {
-					lanes = append(lanes, windowLane(label+" weekly", window))
+					lanes = append(lanes, windowLane(label+" "+codexWindowLabel("weekly", window), window))
 				}
 			}
 		}
 	}
 	return lanes
+}
+
+func codexWindowLabel(fallback string, window map[string]any) string {
+	seconds, ok := number(window["limit_window_seconds"])
+	if !ok {
+		seconds, ok = number(window["window_seconds"])
+	}
+	if !ok {
+		return fallback
+	}
+	suffix := ""
+	if strings.HasSuffix(fallback, " limit") {
+		suffix = " limit"
+	}
+	if seconds == 5*60*60 {
+		return "5h" + suffix
+	}
+	if seconds == 7*24*60*60 {
+		return "weekly" + suffix
+	}
+	return fallback
 }
 
 func windowAt(value any, path ...string) (map[string]any, bool) {
